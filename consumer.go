@@ -32,15 +32,17 @@ type ConsumeFuzzer struct {
 	Funcs                map[reflect.Type]reflect.Value
 	DisallowUnknownTypes bool
 	DisallowCustomFuncs  bool
+	NilChance            float32
 	MaxDepth             int
 }
 
 func NewConsumer(fuzzData []byte) *ConsumeFuzzer {
 	return &ConsumeFuzzer{
-		source:   bytesource.New(fuzzData, 2000000),
-		Funcs:    make(map[reflect.Type]reflect.Value),
-		curDepth: 0,
-		MaxDepth: 100,
+		source:    bytesource.New(fuzzData, 2000000),
+		Funcs:     make(map[reflect.Type]reflect.Value),
+		curDepth:  0,
+		MaxDepth:  100,
+		NilChance: 0.2,
 	}
 }
 
@@ -138,6 +140,15 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value) error {
 			e.SetString(str)
 		}
 	case reflect.Slice:
+		randByte, err := f.source.GetByte()
+		if err != nil {
+			return err
+		}
+
+		if float32(randByte%10) < f.NilChance*10 {
+			return nil
+		}
+
 		var maxElements uint32
 		// Byte slices should not be restricted
 		if e.Type().String() == "[]uint8" {
@@ -229,6 +240,15 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value) error {
 		}
 	case reflect.Map:
 		if e.CanSet() {
+			randByte, err := f.source.GetByte()
+			if err != nil {
+				return err
+			}
+
+			if float32(randByte%10) < f.NilChance*10 {
+				return nil
+			}
+
 			e.Set(reflect.MakeMap(e.Type()))
 			const maxElements = 50
 			randQty, err := f.source.GetInt()
@@ -250,6 +270,15 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value) error {
 		}
 	case reflect.Ptr:
 		if e.CanSet() {
+			randByte, err := f.source.GetByte()
+			if err != nil {
+				return err
+			}
+
+			if float32(randByte%10) < f.NilChance*10 {
+				return nil
+			}
+
 			e.Set(reflect.New(e.Type().Elem()))
 			if err := f.fuzzStruct(e.Elem()); err != nil {
 				return err
