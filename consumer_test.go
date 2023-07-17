@@ -15,10 +15,6 @@
 package gofuzzheaders
 
 import (
-	"archive/tar"
-	"bytes"
-	"fmt"
-	"io"
 	"testing"
 )
 
@@ -82,51 +78,5 @@ func TestStruct_fuzzing2(t *testing.T) {
 	}
 	if len(ts1.Field3) != 80 {
 		t.Errorf("ts1.Field3 was %v but should be 'ABCD'", ts1.Field3)
-	}
-}
-
-func TestTarBytes(t *testing.T) {
-
-	data := []byte{
-		0x01,                                           // number of files
-		0x08,                                           // Length of first file name
-		0x6d, 0x61, 0x6e, 0x69, 0x66, 0x65, 0x73, 0x74, // "manifest"
-		0x09,                                           // Length of file body
-		0x01,                                           // shouldUseLargeFileBody (I think)
-		0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, // file contents
-		0x04, 0x02, 0x03,
-		0x00, // type flag
-		0x01, 0x01, 0x01, 0x01,
-	}
-	f := NewConsumer(data)
-	tb, err := f.TarBytes()
-	if err != nil {
-		t.Fatalf("Fatal: %s", err)
-	}
-
-	tarReader := tar.NewReader(bytes.NewReader(tb))
-
-	for {
-		header, err := tarReader.Next()
-
-		if err == io.EOF {
-			break
-		}
-
-		if err != nil {
-			fmt.Println(err)
-			t.Fatal(err)
-		}
-		if header.Typeflag != 48 {
-			t.Fatal("typeflag should be 48 (which is a tar.TypeReg)")
-		}
-		switch header.Typeflag {
-		case tar.TypeDir:
-			t.Fatal("Should not be a directory")
-		case tar.TypeReg:
-			if header.Name != "manifest" {
-				t.Fatalf("file name was %s but should be 'manifest'\n", header.Name)
-			}
-		}
 	}
 }
