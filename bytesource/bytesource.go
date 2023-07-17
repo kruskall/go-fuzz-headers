@@ -122,15 +122,15 @@ func (f *ByteSource) GetBytes() ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create byte array: %w", err)
 	}
+	if length == 0 {
+		return []byte{}, nil
+	}
 	if f.position+length > f.maxStringLen {
 		return nil, fmt.Errorf("created too large a string: %w", ErrNotEnoughBytes)
 	}
 	byteBegin := f.position - 1
 	if byteBegin >= f.dataTotal {
 		return nil, fmt.Errorf("failed to create byte slice: byte begin past data total: %w", ErrNotEnoughBytes)
-	}
-	if length == 0 {
-		return nil, errors.New("zero-length is not supported")
 	}
 	if byteBegin+length >= f.dataTotal {
 		return nil, fmt.Errorf("failed to create byte slice: byte end past data total: %w", ErrNotEnoughBytes)
