@@ -115,9 +115,6 @@ func (f *ByteSource) GetUint64() (uint64, error) {
 }
 
 func (f *ByteSource) GetBytes() ([]byte, error) {
-	if f.position >= f.dataTotal {
-		return nil, fmt.Errorf("failed to create byte slice: %w", ErrNotEnoughBytes)
-	}
 	length, err := f.GetUint32()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create byte array: %w", err)
@@ -125,18 +122,15 @@ func (f *ByteSource) GetBytes() ([]byte, error) {
 	if length == 0 {
 		return []byte{}, nil
 	}
-	if f.position+length > f.maxStringLen {
-		return nil, fmt.Errorf("created too large a string: %w", ErrNotEnoughBytes)
-	}
-	byteBegin := f.position - 1
+	byteBegin := f.position
 	if byteBegin >= f.dataTotal {
 		return nil, fmt.Errorf("failed to create byte slice: byte begin past data total: %w", ErrNotEnoughBytes)
 	}
 	if byteBegin+length >= f.dataTotal {
 		return nil, fmt.Errorf("failed to create byte slice: byte end past data total: %w", ErrNotEnoughBytes)
 	}
-	if byteBegin+length < byteBegin {
-		return nil, errors.New("numbers overflow")
+	if byteBegin+length > f.maxStringLen {
+		return nil, fmt.Errorf("created too large a string: %w", ErrNotEnoughBytes)
 	}
 	f.position = byteBegin + length
 	return f.data[byteBegin:f.position], nil
