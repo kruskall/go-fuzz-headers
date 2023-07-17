@@ -17,10 +17,13 @@ package gofuzzheaders
 import (
 	"fmt"
 	"reflect"
+
+	"github.com/AdaLogics/go-fuzz-headers/bytesource"
 )
 
 type Continue struct {
-	F *ConsumeFuzzer
+	source *bytesource.ByteSource
+	f      *ConsumeFuzzer
 }
 
 func (f *ConsumeFuzzer) AddFuncs(fuzzFuncs []interface{}) {
@@ -54,9 +57,9 @@ func (f *ConsumeFuzzer) GenerateWithCustom(targetStruct interface{}) error {
 }
 
 func (c Continue) GenerateStruct(targetStruct interface{}) error {
-	return c.F.GenerateStruct(targetStruct)
+	return c.f.GenerateStruct(targetStruct)
 }
 
 func (c Continue) GenerateStructWithCustom(targetStruct interface{}) error {
-	return c.F.GenerateWithCustom(targetStruct)
+	return c.f.GenerateWithCustom(targetStruct)
 }
