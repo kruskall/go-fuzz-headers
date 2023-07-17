@@ -43,12 +43,8 @@ func New(input []byte, maxStringLen uint32) *ByteSource {
 	return s
 }
 
-func IsDivisibleBy(n int, divisibleby int) bool {
-	return (n % divisibleby) == 0
-}
-
 func (f *ByteSource) GetInt() (int, error) {
-	if f.position >= uint32(f.dataTotal) {
+	if f.position >= f.dataTotal {
 		return 0, fmt.Errorf("failed to create int: %w", ErrNotEnoughBytes)
 	}
 	returnInt := int(f.data[f.position])
@@ -175,13 +171,8 @@ func (f *ByteSource) GetBool() (bool, error) {
 	if f.position >= f.dataTotal {
 		return false, fmt.Errorf("failed to create a bool: %w", ErrNotEnoughBytes)
 	}
-	if IsDivisibleBy(int(f.data[f.position]), 2) {
-		f.position++
-		return true, nil
-	} else {
-		f.position++
-		return false, nil
-	}
+	f.position++
+	return int(f.data[f.position])%2 == 0, nil
 }
 
 // GetStringFrom returns a string that can only consist of characters
