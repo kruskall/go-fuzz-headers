@@ -34,7 +34,6 @@ import (
 
 var (
 	MaxTotalLen uint32 = 2000000
-	maxDepth           = 100
 )
 
 func SetMaxTotalLen(newLen uint32) {
@@ -50,6 +49,7 @@ type ConsumeFuzzer struct {
 	position             uint32
 	fuzzUnexportedFields bool
 	curDepth             int
+	MaxDepth             int
 	Funcs                map[reflect.Type]reflect.Value
 }
 
@@ -63,6 +63,7 @@ func NewConsumer(fuzzData []byte) *ConsumeFuzzer {
 		dataTotal: uint32(len(fuzzData)),
 		Funcs:     make(map[reflect.Type]reflect.Value),
 		curDepth:  0,
+		MaxDepth:  100,
 	}
 }
 
@@ -114,26 +115,33 @@ func (f *ConsumeFuzzer) setCustom(v reflect.Value) error {
 	// First: see if we have a fuzz function for it.
 	doCustom, ok := f.Funcs[v.Type()]
 	if !ok {
-		return fmt.Errorf("could not find a custom function")
+		return fmt.Errorf("could not find a custom function: %v", v.Type())
 	}
 
 	switch v.Kind() {
 	case reflect.Ptr:
 		if v.IsNil() {
 			if !v.CanSet() {
-				return fmt.Errorf("could not use a custom function")
+				return fmt.Errorf("could not use a custom function with nil ptr")
 			}
 			v.Set(reflect.New(v.Type().Elem()))
 		}
 	case reflect.Map:
 		if v.IsNil() {
 			if !v.CanSet() {
-				return fmt.Errorf("could not use a custom function")
+				return fmt.Errorf("could not use a custom function with nil map")
 			}
 			v.Set(reflect.MakeMap(v.Type()))
 		}
+	case reflect.Interface:
+		if v.IsNil() {
+			if !v.CanSet() {
+				return fmt.Errorf("could not use a custom function with nil interface")
+			}
+			v.Set(reflect.New(v.Type()))
+		}
 	default:
-		return fmt.Errorf("could not use a custom function")
+		return fmt.Errorf("could not use a custom function with unknown kind")
 	}
 
 	verr := doCustom.Call([]reflect.Value{v, reflect.ValueOf(Continue{
@@ -144,11 +152,16 @@ func (f *ConsumeFuzzer) setCustom(v reflect.Value) error {
 	if verr[0].IsNil() {
 		return nil
 	}
-	return fmt.Errorf("could not use a custom function")
+	return fmt.Errorf("could not use a custom function: %v", verr[0].Interface().(error).Error())
 }
 
 func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value, customFunctions bool) error {
-	if f.curDepth >= maxDepth {
+	if e.IsValid() {
+		fmt.Printf("Type: %s. Kind: %s. CanAddr: %v\n", e.Type().Name(), e.Kind().String(), e.CanAddr())
+	} else {
+		fmt.Printf("Invalid: %s", e.String())
+	}
+	if f.curDepth >= f.MaxDepth {
 		// return err or nil here?
 		return nil
 	}
@@ -157,10 +170,19 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value, customFunctions bool) error 
 
 	// We check if we should check for custom functions
 	if customFunctions && e.IsValid() && e.CanAddr() {
+		fmt.Println("calling wrong set custom")
 		err := f.setCustom(e.Addr())
-		if err != nil {
-			return err
-		}
+		return err
+	}
+
+	if e.IsValid() && e.CanAddr() && f.Funcs[e.Addr().Type()].IsValid() {
+		fmt.Println("calling set custom")
+		err := f.setCustom(e.Addr())
+		return err
+	}
+
+	if e.IsValid() && e.CanAddr() && !f.Funcs[e.Addr().Type()].IsValid() {
+		fmt.Println("not found in funcs")
 	}
 
 	switch e.Kind() {
@@ -207,11 +229,14 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value, customFunctions bool) error 
 			numOfElements = f.dataTotal - f.position
 		}
 
+		fmt.Printf("num of elems: %v\n", numOfElements)
+
 		uu := reflect.MakeSlice(e.Type(), int(numOfElements), int(numOfElements))
 
 		for i := 0; i < int(numOfElements); i++ {
 			// If we have more than 10, then we can proceed with that.
 			if err := f.fuzzStruct(uu.Index(i), customFunctions); err != nil {
+				fmt.Printf("i: %v, canset: %v, err: %v\n", i, e.CanSet(), err)
 				if i >= 10 {
 					if e.CanSet() {
 						e.Set(uu)
@@ -257,6 +282,15 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value, customFunctions bool) error 
 		if e.CanSet() {
 			e.SetInt(int64(newInt))
 		}
+	case reflect.Bool:
+		newBool, err := f.GetBool()
+		if err != nil {
+			return err
+		}
+
+		if e.CanSet() {
+			e.SetBool(newBool)
+		}
 	case reflect.Float32:
 		newFloat, err := f.GetFloat32()
 		if err != nil {
@@ -301,6 +335,8 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value, customFunctions bool) error 
 				return err
 			}
 			return nil
+		} else {
+			fmt.Println("*" + e.Type().Elem().Name())
 		}
 	case reflect.Uint8:
 		b, err := f.GetByte()
@@ -310,6 +346,11 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value, customFunctions bool) error 
 		if e.CanSet() {
 			e.SetUint(uint64(b))
 		}
+	default:
+		panic(e.Kind())
+	}
+	if !e.CanSet() {
+		panic("AAA")
 	}
 	return nil
 }
