@@ -31,6 +31,7 @@ type ConsumeFuzzer struct {
 	curDepth             int
 	Funcs                map[reflect.Type]reflect.Value
 	DisallowUnknownTypes bool
+	DisallowCustomFuncs  bool
 	MaxDepth             int
 }
 
@@ -53,7 +54,7 @@ func (f *ConsumeFuzzer) DisallowUnexportedFields() {
 
 func (f *ConsumeFuzzer) GenerateStruct(targetStruct interface{}) error {
 	e := reflect.ValueOf(targetStruct).Elem()
-	return f.fuzzStruct(e, false)
+	return f.fuzzStruct(e)
 }
 
 func (f *ConsumeFuzzer) setCustom(v reflect.Value) error {
@@ -96,7 +97,7 @@ func (f *ConsumeFuzzer) setCustom(v reflect.Value) error {
 	return fmt.Errorf("could not use a custom function: %s", verr[0].String())
 }
 
-func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value, customFunctions bool) error {
+func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value) error {
 	if f.curDepth >= f.MaxDepth {
 		// return err or nil here?
 		return nil
@@ -105,11 +106,8 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value, customFunctions bool) error 
 	defer func() { f.curDepth-- }()
 
 	// We check if we should check for custom functions
-	if customFunctions && e.IsValid() && e.CanAddr() {
-		err := f.setCustom(e.Addr())
-		if err != nil {
-			return err
-		}
+	if !f.DisallowCustomFuncs && e.IsValid() && e.CanAddr() && f.hasCustomFunction(e.Addr()) {
+		return f.setCustom(e.Addr())
 	}
 
 	switch e.Kind() {
@@ -120,12 +118,12 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value, customFunctions bool) error 
 				if f.fuzzUnexportedFields {
 					v = reflect.NewAt(e.Field(i).Type(), unsafe.Pointer(e.Field(i).UnsafeAddr())).Elem()
 				}
-				if err := f.fuzzStruct(v, customFunctions); err != nil {
+				if err := f.fuzzStruct(v); err != nil {
 					return err
 				}
 			} else {
 				v = e.Field(i)
-				if err := f.fuzzStruct(v, customFunctions); err != nil {
+				if err := f.fuzzStruct(v); err != nil {
 					return err
 				}
 			}
@@ -157,7 +155,7 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value, customFunctions bool) error 
 
 		for i := 0; i < int(numOfElements); i++ {
 			// If we have more than 10, then we can proceed with that.
-			if err := f.fuzzStruct(uu.Index(i), customFunctions); err != nil {
+			if err := f.fuzzStruct(uu.Index(i)); err != nil {
 				if i >= 10 {
 					if e.CanSet() {
 						e.Set(uu)
@@ -239,11 +237,11 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value, customFunctions bool) error 
 			numOfElements := randQty % maxElements
 			for i := 0; i < numOfElements; i++ {
 				key := reflect.New(e.Type().Key()).Elem()
-				if err := f.fuzzStruct(key, customFunctions); err != nil {
+				if err := f.fuzzStruct(key); err != nil {
 					return err
 				}
 				val := reflect.New(e.Type().Elem()).Elem()
-				if err = f.fuzzStruct(val, customFunctions); err != nil {
+				if err = f.fuzzStruct(val); err != nil {
 					return err
 				}
 				e.SetMapIndex(key, val)
@@ -252,7 +250,7 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value, customFunctions bool) error 
 	case reflect.Ptr:
 		if e.CanSet() {
 			e.Set(reflect.New(e.Type().Elem()))
-			if err := f.fuzzStruct(e.Elem(), customFunctions); err != nil {
+			if err := f.fuzzStruct(e.Elem()); err != nil {
 				return err
 			}
 			return nil
@@ -274,4 +272,9 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value, customFunctions bool) error 
 		}
 	}
 	return nil
+}
+
+func (f *ConsumeFuzzer) hasCustomFunction(v reflect.Value) bool {
+	_, ok := f.Funcs[v.Type()]
+	return ok
 }

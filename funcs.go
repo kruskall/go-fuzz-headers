@@ -51,15 +51,6 @@ func (f *ConsumeFuzzer) AddFuncs(fuzzFuncs []interface{}) {
 	}
 }
 
-func (f *ConsumeFuzzer) GenerateWithCustom(targetStruct interface{}) error {
-	e := reflect.ValueOf(targetStruct).Elem()
-	return f.fuzzStruct(e, true)
-}
-
 func (c Continue) GenerateStruct(targetStruct interface{}) error {
 	return c.f.GenerateStruct(targetStruct)
-}
-
-func (c Continue) GenerateStructWithCustom(targetStruct interface{}) error {
-	return c.f.GenerateWithCustom(targetStruct)
 }
