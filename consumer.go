@@ -25,7 +25,6 @@ import (
 
 var (
 	MaxTotalLen uint32 = 2000000
-	maxDepth           = 100
 )
 
 func SetMaxTotalLen(newLen uint32) {
@@ -43,6 +42,7 @@ type ConsumeFuzzer struct {
 	curDepth             int
 	Funcs                map[reflect.Type]reflect.Value
 	DisallowUnknownTypes bool
+	MaxDepth             int
 }
 
 func IsDivisibleBy(n int, divisibleby int) bool {
@@ -55,6 +55,7 @@ func NewConsumer(fuzzData []byte) *ConsumeFuzzer {
 		dataTotal: uint32(len(fuzzData)),
 		Funcs:     make(map[reflect.Type]reflect.Value),
 		curDepth:  0,
+		MaxDepth:  100,
 	}
 }
 
@@ -140,7 +141,7 @@ func (f *ConsumeFuzzer) setCustom(v reflect.Value) error {
 }
 
 func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value, customFunctions bool) error {
-	if f.curDepth >= maxDepth {
+	if f.curDepth >= f.MaxDepth {
 		// return err or nil here?
 		return nil
 	}
