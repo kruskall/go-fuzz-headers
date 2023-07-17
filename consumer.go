@@ -51,6 +51,7 @@ type ConsumeFuzzer struct {
 	fuzzUnexportedFields bool
 	curDepth             int
 	Funcs                map[reflect.Type]reflect.Value
+	DisallowUnknownTypes bool
 }
 
 func IsDivisibleBy(n int, divisibleby int) bool {
@@ -318,6 +319,13 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value, customFunctions bool) error 
 		}
 		if e.CanSet() {
 			e.SetUint(uint64(b))
+		}
+	default:
+		if f.DisallowUnknownTypes {
+			if !e.IsValid() {
+				return fmt.Errorf("unknown invalid type: %s", e.String())
+			}
+			return fmt.Errorf("unknown type: kind: %s: %s", e.Kind(), e.String())
 		}
 	}
 	return nil
