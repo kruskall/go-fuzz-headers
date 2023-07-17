@@ -90,7 +90,10 @@ func (f *ConsumeFuzzer) setCustom(v reflect.Value) error {
 	if verr[0].IsNil() {
 		return nil
 	}
-	return fmt.Errorf("could not use a custom function")
+	if err, ok := verr[0].Interface().(error); ok {
+		return fmt.Errorf("could not use a custom function: %w", err)
+	}
+	return fmt.Errorf("could not use a custom function: %s", verr[0].String())
 }
 
 func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value, customFunctions bool) error {
