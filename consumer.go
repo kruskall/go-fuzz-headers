@@ -273,6 +273,15 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value, customFunctions bool) error 
 		if e.CanSet() {
 			e.SetFloat(float64(newFloat))
 		}
+	case reflect.Bool:
+		newBool, err := f.GetBool()
+		if err != nil {
+			return err
+		}
+
+		if e.CanSet() {
+			e.SetBool(newBool)
+		}
 	case reflect.Map:
 		if e.CanSet() {
 			e.Set(reflect.MakeMap(e.Type()))
