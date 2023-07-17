@@ -44,17 +44,16 @@ func New(input []byte, maxStringLen uint32) *ByteSource {
 }
 
 func (f *ByteSource) GetInt() (int, error) {
-	if f.position >= f.dataTotal {
-		return 0, fmt.Errorf("failed to create int: %w", ErrNotEnoughBytes)
+	returnByte, err := f.GetByte()
+	if err != nil {
+		return 0, fmt.Errorf("failed to create int: %w", err)
 	}
-	returnInt := int(f.data[f.position])
-	f.position++
-	return returnInt, nil
+	return int(returnByte), nil
 }
 
 func (f *ByteSource) GetByte() (byte, error) {
 	if f.position >= f.dataTotal {
-		return 0x00, fmt.Errorf("failed to get bytes: %w", ErrNotEnoughBytes)
+		return 0x00, fmt.Errorf("failed to get byte: %w", ErrNotEnoughBytes)
 	}
 	returnByte := f.data[f.position]
 	f.position++
@@ -63,13 +62,13 @@ func (f *ByteSource) GetByte() (byte, error) {
 
 func (f *ByteSource) GetNBytes(numberOfBytes int) ([]byte, error) {
 	if f.position >= f.dataTotal {
-		return nil, fmt.Errorf("failed to get byte: %w", ErrNotEnoughBytes)
+		return nil, fmt.Errorf("failed to get bytes: %w", ErrNotEnoughBytes)
 	}
 	returnBytes := make([]byte, 0, numberOfBytes)
 	for i := 0; i < numberOfBytes; i++ {
 		newByte, err := f.GetByte()
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to get byte: %w", err)
 		}
 		returnBytes = append(returnBytes, newByte)
 	}
@@ -79,11 +78,11 @@ func (f *ByteSource) GetNBytes(numberOfBytes int) ([]byte, error) {
 func (f *ByteSource) GetUint16() (uint16, error) {
 	u16, err := f.GetNBytes(2)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to create uint16: %w", err)
 	}
 	littleEndian, err := f.GetBool()
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to create uint16: %w", err)
 	}
 	if littleEndian {
 		return binary.LittleEndian.Uint16(u16), nil
@@ -94,7 +93,7 @@ func (f *ByteSource) GetUint16() (uint16, error) {
 func (f *ByteSource) GetUint32() (uint32, error) {
 	i, err := f.GetInt()
 	if err != nil {
-		return uint32(0), err
+		return 0, fmt.Errorf("failed to create uint32: %w", err)
 	}
 	return uint32(i), nil
 }
@@ -102,11 +101,11 @@ func (f *ByteSource) GetUint32() (uint32, error) {
 func (f *ByteSource) GetUint64() (uint64, error) {
 	u64, err := f.GetNBytes(8)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to create uint64: %w", err)
 	}
 	littleEndian, err := f.GetBool()
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to create uint64: %w", err)
 	}
 	if littleEndian {
 		return binary.LittleEndian.Uint64(u64), nil
@@ -146,11 +145,11 @@ func (f *ByteSource) GetString() (string, error) {
 }
 
 func (f *ByteSource) GetBool() (bool, error) {
-	if f.position >= f.dataTotal {
-		return false, fmt.Errorf("failed to create a bool: %w", ErrNotEnoughBytes)
+	i, err := f.GetInt()
+	if err != nil {
+		return false, fmt.Errorf("failed to create bool: %w", err)
 	}
-	f.position++
-	return int(f.data[f.position])%2 == 0, nil
+	return i%2 == 0, nil
 }
 
 // GetStringFrom returns a string that can only consist of characters
@@ -164,7 +163,7 @@ func (f *ByteSource) GetStringFrom(possibleChars string, length int) (string, er
 	for i := 0; i < length; i++ {
 		charIndex, err := f.GetInt()
 		if err != nil {
-			return string(output), err
+			return string(output), fmt.Errorf("failed to create a string: %w", err)
 		}
 		output = append(output, possibleChars[charIndex%len(possibleChars)])
 	}
@@ -174,7 +173,7 @@ func (f *ByteSource) GetStringFrom(possibleChars string, length int) (string, er
 func (f *ByteSource) GetRune() ([]rune, error) {
 	stringToConvert, err := f.GetString()
 	if err != nil {
-		return []rune("nil"), err
+		return []rune("nil"), fmt.Errorf("failed to create rune: %w", err)
 	}
 	return []rune(stringToConvert), nil
 }
@@ -182,11 +181,11 @@ func (f *ByteSource) GetRune() ([]rune, error) {
 func (f *ByteSource) GetFloat32() (float32, error) {
 	u32, err := f.GetNBytes(4)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to create float32: %w", err)
 	}
 	littleEndian, err := f.GetBool()
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to create float32: %w", err)
 	}
 	if littleEndian {
 		u32LE := binary.LittleEndian.Uint32(u32)
@@ -199,11 +198,11 @@ func (f *ByteSource) GetFloat32() (float32, error) {
 func (f *ByteSource) GetFloat64() (float64, error) {
 	u64, err := f.GetNBytes(8)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to create float64: %w", err)
 	}
 	littleEndian, err := f.GetBool()
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("failed to create float64: %w", err)
 	}
 	if littleEndian {
 		u64LE := binary.LittleEndian.Uint64(u64)
