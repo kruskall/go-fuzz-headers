@@ -83,7 +83,7 @@ func (f *ConsumeFuzzer) setCustom(v reflect.Value) error {
 	}
 
 	verr := doCustom.Call([]reflect.Value{v, reflect.ValueOf(Continue{
-		F: f,
+		f: f,
 	})})
 
 	// check if we return an error
