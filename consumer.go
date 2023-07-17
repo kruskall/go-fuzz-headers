@@ -23,14 +23,6 @@ import (
 	"unsafe"
 )
 
-var (
-	MaxTotalLen uint32 = 2000000
-)
-
-func SetMaxTotalLen(newLen uint32) {
-	MaxTotalLen = newLen
-}
-
 type ConsumeFuzzer struct {
 	data                 []byte
 	dataTotal            uint32
@@ -43,6 +35,7 @@ type ConsumeFuzzer struct {
 	Funcs                map[reflect.Type]reflect.Value
 	DisallowUnknownTypes bool
 	MaxDepth             int
+	MaxTotalLen          uint32
 }
 
 func IsDivisibleBy(n int, divisibleby int) bool {
@@ -51,11 +44,12 @@ func IsDivisibleBy(n int, divisibleby int) bool {
 
 func NewConsumer(fuzzData []byte) *ConsumeFuzzer {
 	return &ConsumeFuzzer{
-		data:      fuzzData,
-		dataTotal: uint32(len(fuzzData)),
-		Funcs:     make(map[reflect.Type]reflect.Value),
-		curDepth:  0,
-		MaxDepth:  100,
+		data:        fuzzData,
+		dataTotal:   uint32(len(fuzzData)),
+		Funcs:       make(map[reflect.Type]reflect.Value),
+		curDepth:    0,
+		MaxDepth:    100,
+		MaxTotalLen: 2000000,
 	}
 }
 
@@ -428,7 +422,7 @@ func (f *ConsumeFuzzer) GetBytes() ([]byte, error) {
 	if err != nil {
 		return nil, errors.New("not enough bytes to create byte array")
 	}
-	if f.position+length > MaxTotalLen {
+	if f.position+length > f.MaxTotalLen {
 		return nil, errors.New("created too large a string")
 	}
 	byteBegin := f.position - 1
@@ -456,7 +450,7 @@ func (f *ConsumeFuzzer) GetString() (string, error) {
 	if err != nil {
 		return "nil", errors.New("not enough bytes to create string")
 	}
-	if f.position > MaxTotalLen {
+	if f.position > f.MaxTotalLen {
 		return "nil", errors.New("created too large a string")
 	}
 	byteBegin := f.position
