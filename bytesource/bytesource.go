@@ -143,28 +143,12 @@ func (f *ByteSource) GetBytes() ([]byte, error) {
 }
 
 func (f *ByteSource) GetString() (string, error) {
-	if f.position >= f.dataTotal {
-		return "nil", fmt.Errorf("failed to create string: %w", ErrNotEnoughBytes)
-	}
-	length, err := f.GetUint32()
+	b, err := f.GetBytes()
 	if err != nil {
 		return "nil", fmt.Errorf("failed to create string: %w", err)
 	}
-	if f.position > f.maxStringLen {
-		return "nil", errors.New("created too large a string")
-	}
-	byteBegin := f.position
-	if byteBegin >= f.dataTotal {
-		return "nil", fmt.Errorf("failed to create string: byte begin past data total: %w", ErrNotEnoughBytes)
-	}
-	if byteBegin+length > f.dataTotal {
-		return "nil", fmt.Errorf("failed to create string: byte end past data total: %w", ErrNotEnoughBytes)
-	}
-	if byteBegin > byteBegin+length {
-		return "nil", errors.New("numbers overflow")
-	}
-	f.position = byteBegin + length
-	return string(f.data[byteBegin:f.position]), nil
+
+	return string(b), nil
 }
 
 func (f *ByteSource) GetBool() (bool, error) {
