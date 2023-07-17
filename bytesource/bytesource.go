@@ -17,6 +17,7 @@ package bytesource
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"math"
 )
 
@@ -26,6 +27,10 @@ type ByteSource struct {
 	position     uint32
 	maxStringLen uint32
 }
+
+var (
+	ErrNotEnoughBytes = errors.New("not enough bytes")
+)
 
 // New returns a new ByteSource from a given slice of bytes.
 func New(input []byte, maxStringLen uint32) *ByteSource {
@@ -44,7 +49,7 @@ func IsDivisibleBy(n int, divisibleby int) bool {
 
 func (f *ByteSource) GetInt() (int, error) {
 	if f.position >= uint32(f.dataTotal) {
-		return 0, errors.New("not enough bytes to create int")
+		return 0, fmt.Errorf("failed to create int: %w", ErrNotEnoughBytes)
 	}
 	returnInt := int(f.data[f.position])
 	f.position++
@@ -53,7 +58,7 @@ func (f *ByteSource) GetInt() (int, error) {
 
 func (f *ByteSource) GetByte() (byte, error) {
 	if f.position >= f.dataTotal {
-		return 0x00, errors.New("not enough bytes to get byte")
+		return 0x00, fmt.Errorf("failed to get bytes: %w", ErrNotEnoughBytes)
 	}
 	returnByte := f.data[f.position]
 	f.position++
@@ -62,7 +67,7 @@ func (f *ByteSource) GetByte() (byte, error) {
 
 func (f *ByteSource) GetNBytes(numberOfBytes int) ([]byte, error) {
 	if f.position >= f.dataTotal {
-		return nil, errors.New("not enough bytes to get byte")
+		return nil, fmt.Errorf("failed to get byte: %w", ErrNotEnoughBytes)
 	}
 	returnBytes := make([]byte, 0, numberOfBytes)
 	for i := 0; i < numberOfBytes; i++ {
@@ -115,24 +120,24 @@ func (f *ByteSource) GetUint64() (uint64, error) {
 
 func (f *ByteSource) GetBytes() ([]byte, error) {
 	if f.position >= f.dataTotal {
-		return nil, errors.New("not enough bytes to create byte array")
+		return nil, fmt.Errorf("failed to create byte slice: %w", ErrNotEnoughBytes)
 	}
 	length, err := f.GetUint32()
 	if err != nil {
-		return nil, errors.New("not enough bytes to create byte array")
+		return nil, fmt.Errorf("failed to create byte array: %w", err)
 	}
 	if f.position+length > f.maxStringLen {
-		return nil, errors.New("created too large a string")
+		return nil, fmt.Errorf("created too large a string: %w", ErrNotEnoughBytes)
 	}
 	byteBegin := f.position - 1
 	if byteBegin >= f.dataTotal {
-		return nil, errors.New("not enough bytes to create byte array")
+		return nil, fmt.Errorf("failed to create byte slice: byte begin past data total: %w", ErrNotEnoughBytes)
 	}
 	if length == 0 {
 		return nil, errors.New("zero-length is not supported")
 	}
 	if byteBegin+length >= f.dataTotal {
-		return nil, errors.New("not enough bytes to create byte array")
+		return nil, fmt.Errorf("failed to create byte slice: byte end past data total: %w", ErrNotEnoughBytes)
 	}
 	if byteBegin+length < byteBegin {
 		return nil, errors.New("numbers overflow")
@@ -143,21 +148,21 @@ func (f *ByteSource) GetBytes() ([]byte, error) {
 
 func (f *ByteSource) GetString() (string, error) {
 	if f.position >= f.dataTotal {
-		return "nil", errors.New("not enough bytes to create string")
+		return "nil", fmt.Errorf("failed to create string: %w", ErrNotEnoughBytes)
 	}
 	length, err := f.GetUint32()
 	if err != nil {
-		return "nil", errors.New("not enough bytes to create string")
+		return "nil", fmt.Errorf("failed to create string: %w", err)
 	}
 	if f.position > f.maxStringLen {
 		return "nil", errors.New("created too large a string")
 	}
 	byteBegin := f.position
 	if byteBegin >= f.dataTotal {
-		return "nil", errors.New("not enough bytes to create string")
+		return "nil", fmt.Errorf("failed to create string: byte begin past data total: %w", ErrNotEnoughBytes)
 	}
 	if byteBegin+length > f.dataTotal {
-		return "nil", errors.New("not enough bytes to create string")
+		return "nil", fmt.Errorf("failed to create string: byte end past data total: %w", ErrNotEnoughBytes)
 	}
 	if byteBegin > byteBegin+length {
 		return "nil", errors.New("numbers overflow")
@@ -168,7 +173,7 @@ func (f *ByteSource) GetString() (string, error) {
 
 func (f *ByteSource) GetBool() (bool, error) {
 	if f.position >= f.dataTotal {
-		return false, errors.New("not enough bytes to create bool")
+		return false, fmt.Errorf("failed to create a bool: %w", ErrNotEnoughBytes)
 	}
 	if IsDivisibleBy(int(f.data[f.position]), 2) {
 		f.position++
@@ -184,7 +189,7 @@ func (f *ByteSource) GetBool() (bool, error) {
 // does not have the specified length.
 func (f *ByteSource) GetStringFrom(possibleChars string, length int) (string, error) {
 	if (f.dataTotal - f.position) < uint32(length) {
-		return "", errors.New("not enough bytes to create a string")
+		return "", fmt.Errorf("failed to create a string: %w", ErrNotEnoughBytes)
 	}
 	output := make([]byte, 0, length)
 	for i := 0; i < length; i++ {
