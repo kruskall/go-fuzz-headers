@@ -22,7 +22,7 @@ import (
 )
 
 type Continue struct {
-	source *bytesource.ByteSource
+	Source *bytesource.ByteSource
 	f      *ConsumeFuzzer
 }
 
