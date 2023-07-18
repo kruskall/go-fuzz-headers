@@ -101,6 +101,7 @@ func (f *ConsumeFuzzer) setCustom(v reflect.Value) error {
 }
 
 func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value) error {
+	//fmt.Printf("%s.%s: %v\n", e.Type().PkgPath(), e.Type().Name(), e.Kind())
 	if f.curDepth >= f.MaxDepth {
 		// return err or nil here?
 		return nil
@@ -119,6 +120,7 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value) error {
 			var v reflect.Value
 			if !e.Field(i).CanSet() {
 				if f.fuzzUnexportedFields {
+					//panic(e.Type().PkgPath()+"."+e.Type().Name())
 					v = reflect.NewAt(e.Field(i).Type(), unsafe.Pointer(e.Field(i).UnsafeAddr())).Elem()
 				}
 				if err := f.fuzzStruct(v); err != nil {
@@ -138,6 +140,17 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value) error {
 		}
 		if e.CanSet() {
 			e.SetString(str)
+		}
+	case reflect.Array:
+		a := reflect.New(e.Type()).Elem()
+		for i := 0; i < int(a.Len()); i++ {
+			// If we have more than 10, then we can proceed with that.
+			if err := f.fuzzStruct(a.Index(i)); err != nil {
+				return err
+			}
+		}
+		if e.CanSet() {
+			e.Set(a)
 		}
 	case reflect.Slice:
 		randByte, err := f.source.GetByte()
@@ -162,20 +175,14 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value) error {
 			return err
 		}
 		numOfElements := randQty % maxElements
+		numOfElements = 1
 
 		uu := reflect.MakeSlice(e.Type(), int(numOfElements), int(numOfElements))
 
 		for i := 0; i < int(numOfElements); i++ {
 			// If we have more than 10, then we can proceed with that.
 			if err := f.fuzzStruct(uu.Index(i)); err != nil {
-				if i >= 10 {
-					if e.CanSet() {
-						e.Set(uu)
-					}
-					return nil
-				} else {
-					return err
-				}
+				return err
 			}
 		}
 		if e.CanSet() {
@@ -275,7 +282,8 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value) error {
 				return err
 			}
 
-			if float32(randByte%10) < f.NilChance*10 {
+			if !f.isAlwaysSet(e.Type().Elem()) && float32(randByte%10) < f.NilChance*10 {
+				//panic("PKG " + e.Type().Elem().PkgPath() + "." + e.Type().Elem().Name())
 				return nil
 			}
 
@@ -294,6 +302,17 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value) error {
 			e.SetUint(uint64(b))
 		}
 	default:
+		if e.Kind() == reflect.Interface {
+			name := e.Type().PkgPath() + "." + e.Type().Name()
+			if name == "go.opentelemetry.io/collector/pdata/internal/data/protogen/common/v1.isAnyValue_Value" {
+				p := reflect.New(e.Type())
+				e.Set(p.Elem())
+				u := p.Pointer()
+				*(*isAnyValue_Value)(unsafe.Pointer(u)) = foo{}
+				return nil
+			}
+			panic(name)
+		}
 		if f.DisallowUnknownTypes {
 			if !e.IsValid() {
 				return fmt.Errorf("unknown invalid type: %s", e.String())
@@ -302,6 +321,36 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value) error {
 		}
 	}
 	return nil
+}
+
+type isAnyValue_Value interface {
+	isAnyValue_Value()
+	MarshalTo([]byte) (int, error)
+	Size() int
+}
+
+type foo struct{ S string }
+
+func (f foo) isAnyValue_Value()             {}
+func (f foo) MarshalTo([]byte) (int, error) { return 0, nil }
+func (f foo) Size() int                     { return 0 }
+
+func (f *ConsumeFuzzer) isAlwaysSet(v reflect.Type) bool {
+	name := v.PkgPath() + "." + v.Name()
+	switch name {
+	case
+		"go.opentelemetry.io/collector/pdata/plog.Logs",
+		"go.opentelemetry.io/collector/pdata/internal/data/protogen/collector/logs/v1.ExportLogsServiceRequest",
+		"go.opentelemetry.io/collector/pdata/internal/data/protogen/logs/v1.ResourceLogs",
+		"go.opentelemetry.io/collector/pdata/internal/data/protogen/logs/v1.ScopeLogs",
+		"go.opentelemetry.io/collector/pdata/internal/data/protogen/logs/v1.LogRecord",
+		"":
+		//fmt.Println("Ignoring " + name)
+		return true
+	default:
+		//fmt.Println("Not ignoring " + name)
+		return false
+	}
 }
 
 func (f *ConsumeFuzzer) hasCustomFunction(v reflect.Value) bool {
