@@ -1,10 +1,11 @@
-package gofuzzheaders
+package gofuzzheaders_test
 
 import (
 	"errors"
 	"os"
 	"testing"
 
+	gofuzzheaders "github.com/AdaLogics/go-fuzz-headers"
 	"github.com/AdaLogics/go-fuzz-headers/bytesource"
 )
 
@@ -15,7 +16,7 @@ func skipIfTesting(f *testing.F) {
 	}
 }
 
-func generate(t *testing.T, fuzzer *ConsumeFuzzer, a any) {
+func generate(t *testing.T, fuzzer *gofuzzheaders.ConsumeFuzzer, a any) {
 	t.Helper()
 
 	if err := fuzzer.GenerateStruct(a); err != nil {
@@ -30,7 +31,7 @@ func FuzzBool(f *testing.F) {
 	skipIfTesting(f)
 
 	f.Fuzz(func(t *testing.T, input []byte) {
-		c := NewConsumer(input)
+		c := gofuzzheaders.NewConsumer(input)
 
 		s := struct {
 			B bool
@@ -48,7 +49,7 @@ func FuzzPtr(f *testing.F) {
 	skipIfTesting(f)
 
 	f.Fuzz(func(t *testing.T, input []byte) {
-		c := NewConsumer(input)
+		c := gofuzzheaders.NewConsumer(input)
 
 		s := struct {
 			I *byte
@@ -66,11 +67,12 @@ func FuzzAny(f *testing.F) {
 	skipIfTesting(f)
 
 	f.Fuzz(func(t *testing.T, input []byte) {
-		c := NewConsumer(input)
-		c.AddFuncs([]any{func(a *any, c Continue) error {
-			*a = "foo"
-			return nil
-		}})
+		c := gofuzzheaders.NewConsumer(input,
+			gofuzzheaders.WithCustomFunction(func(a *any, c gofuzzheaders.Continue) error {
+				*a = "foo"
+				return nil
+			}),
+		)
 
 		s := struct {
 			A any
@@ -88,13 +90,14 @@ func FuzzSliceAny(f *testing.F) {
 	skipIfTesting(f)
 
 	f.Fuzz(func(t *testing.T, input []byte) {
-		c := NewConsumer(input)
-		c.AddFuncs([]any{func(a *any, c Continue) error {
-			*a = "foo"
-			return nil
-		}})
+		c := gofuzzheaders.NewConsumer(input,
+			gofuzzheaders.WithCustomFunction(func(a *any, c gofuzzheaders.Continue) error {
+				*a = "foo"
+				return nil
+			}),
+		)
 
-		s := struct{
+		s := struct {
 			A []any
 		}{}
 

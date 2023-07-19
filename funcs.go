@@ -26,7 +26,7 @@ type Continue struct {
 	f      *ConsumeFuzzer
 }
 
-func (f *ConsumeFuzzer) AddFuncs(fuzzFuncs []interface{}) {
+func (f *ConsumeFuzzer) addFuncs(fuzzFuncs []interface{}) {
 	for i := range fuzzFuncs {
 		v := reflect.ValueOf(fuzzFuncs[i])
 		if v.Kind() != reflect.Func {
@@ -47,7 +47,7 @@ func (f *ConsumeFuzzer) AddFuncs(fuzzFuncs []interface{}) {
 		if t.In(1) != reflect.TypeOf(Continue{}) {
 			panic("fuzzFunc's second parameter must be type Continue")
 		}
-		f.Funcs[argT] = v
+		f.customFuncs[argT] = v
 	}
 }
 

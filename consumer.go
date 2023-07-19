@@ -23,35 +23,31 @@ import (
 )
 
 type ConsumeFuzzer struct {
-	source               *bytesource.ByteSource
-	CommandPart          []byte
-	RestOfArray          []byte
-	NumberOfCalls        int
-	fuzzUnexportedFields bool
-	curDepth             int
-	Funcs                map[reflect.Type]reflect.Value
-	DisallowUnknownTypes bool
-	DisallowCustomFuncs  bool
-	NilChance            float32
-	MaxDepth             int
+	source   *bytesource.ByteSource
+	curDepth int64
+
+	nilChance               float32
+	maxDepth                int64
+	unexportedFieldStrategy HandlingStrategy
+	unknownTypeStrategy     HandlingStrategy
+	disallowCustomFuncs     bool
+	customFuncs             map[reflect.Type]reflect.Value
 }
 
-func NewConsumer(fuzzData []byte) *ConsumeFuzzer {
-	return &ConsumeFuzzer{
-		source:    bytesource.New(fuzzData, 2000000),
-		Funcs:     make(map[reflect.Type]reflect.Value),
-		curDepth:  0,
-		MaxDepth:  100,
-		NilChance: 0.2,
+func NewConsumer(fuzzData []byte, opts ...Option) *ConsumeFuzzer {
+	cf := &ConsumeFuzzer{
+		source:      bytesource.New(fuzzData, 2000000),
+		customFuncs: make(map[reflect.Type]reflect.Value),
+		curDepth:    0,
+		maxDepth:    100,
+		nilChance:   0.2,
 	}
-}
 
-func (f *ConsumeFuzzer) AllowUnexportedFields() {
-	f.fuzzUnexportedFields = true
-}
+	for _, opt := range opts {
+		opt(cf)
+	}
 
-func (f *ConsumeFuzzer) DisallowUnexportedFields() {
-	f.fuzzUnexportedFields = false
+	return cf
 }
 
 func (f *ConsumeFuzzer) GenerateStruct(targetStruct interface{}) error {
@@ -61,7 +57,7 @@ func (f *ConsumeFuzzer) GenerateStruct(targetStruct interface{}) error {
 
 func (f *ConsumeFuzzer) setCustom(v reflect.Value) error {
 	// First: see if we have a fuzz function for it.
-	doCustom, ok := f.Funcs[v.Type()]
+	doCustom, ok := f.customFuncs[v.Type()]
 	if !ok {
 		return fmt.Errorf("could not find a custom function")
 	}
@@ -101,7 +97,7 @@ func (f *ConsumeFuzzer) setCustom(v reflect.Value) error {
 }
 
 func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value) error {
-	if f.curDepth >= f.MaxDepth {
+	if f.curDepth >= f.maxDepth {
 		// return err or nil here?
 		return nil
 	}
@@ -109,7 +105,7 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value) error {
 	defer func() { f.curDepth-- }()
 
 	// We check if we should check for custom functions
-	if !f.DisallowCustomFuncs && e.IsValid() && e.CanAddr() && f.hasCustomFunction(e.Addr()) {
+	if !f.disallowCustomFuncs && e.IsValid() && e.CanAddr() && f.hasCustomFunction(e.Addr()) {
 		return f.setCustom(e.Addr())
 	}
 
@@ -118,7 +114,7 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value) error {
 		for i := 0; i < e.NumField(); i++ {
 			var v reflect.Value
 			if !e.Field(i).CanSet() {
-				if f.fuzzUnexportedFields {
+				if f.unexportedFieldStrategy == KeepFuzzing {
 					v = reflect.NewAt(e.Field(i).Type(), unsafe.Pointer(e.Field(i).UnsafeAddr())).Elem()
 				}
 				if err := f.fuzzStruct(v); err != nil {
@@ -145,7 +141,7 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value) error {
 			return err
 		}
 
-		if float32(randByte%10) < f.NilChance*10 {
+		if float32(randByte%10) < f.nilChance*10 {
 			return nil
 		}
 
@@ -245,7 +241,7 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value) error {
 				return err
 			}
 
-			if float32(randByte%10) < f.NilChance*10 {
+			if float32(randByte%10) < f.nilChance*10 {
 				return nil
 			}
 
@@ -275,7 +271,7 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value) error {
 				return err
 			}
 
-			if float32(randByte%10) < f.NilChance*10 {
+			if float32(randByte%10) < f.nilChance*10 {
 				return nil
 			}
 
@@ -294,7 +290,7 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value) error {
 			e.SetUint(uint64(b))
 		}
 	default:
-		if f.DisallowUnknownTypes {
+		if f.unknownTypeStrategy == FailWithError {
 			if !e.IsValid() {
 				return fmt.Errorf("unknown invalid type: %s", e.String())
 			}
@@ -305,6 +301,6 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value) error {
 }
 
 func (f *ConsumeFuzzer) hasCustomFunction(v reflect.Value) bool {
-	_, ok := f.Funcs[v.Type()]
+	_, ok := f.customFuncs[v.Type()]
 	return ok
 }
