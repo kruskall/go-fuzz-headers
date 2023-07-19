@@ -10,12 +10,23 @@ import (
 
 func skipIfTesting(f *testing.F) {
 	v := "DEBUG_FUZZ"
-	if os.Getenv(v) != "true" {
+	if os.Getenv(v) != "1" {
 		f.Skip("Skipped fuzz test, enable with " + v)
 	}
 }
 
-func FuzzStructBool(f *testing.F) {
+func generate(t *testing.T, fuzzer *ConsumeFuzzer, a any) {
+	t.Helper()
+
+	if err := fuzzer.GenerateStruct(a); err != nil {
+		if errors.Is(err, bytesource.ErrNotEnoughBytes) {
+			t.SkipNow()
+		}
+		t.Fatalf("failed to generate struct: %v", err)
+	}
+}
+
+func FuzzBool(f *testing.F) {
 	skipIfTesting(f)
 
 	f.Fuzz(func(t *testing.T, input []byte) {
@@ -25,12 +36,7 @@ func FuzzStructBool(f *testing.F) {
 			B bool
 		}{}
 
-		if err := c.GenerateStruct(&s); err != nil {
-			if errors.Is(err, bytesource.ErrNotEnoughBytes) {
-				return
-			}
-			t.Fatalf("failed to generate struct: %v", err)
-		}
+		generate(t, c, &s)
 
 		if s.B {
 			panic("IT WORKS")
@@ -38,7 +44,7 @@ func FuzzStructBool(f *testing.F) {
 	})
 }
 
-func FuzzStructPtr(f *testing.F) {
+func FuzzPtr(f *testing.F) {
 	skipIfTesting(f)
 
 	f.Fuzz(func(t *testing.T, input []byte) {
@@ -48,12 +54,7 @@ func FuzzStructPtr(f *testing.F) {
 			I *byte
 		}{}
 
-		if err := c.GenerateStruct(&s); err != nil {
-			if errors.Is(err, bytesource.ErrNotEnoughBytes) {
-				return
-			}
-			t.Fatalf("failed to generate struct: %v", err)
-		}
+		generate(t, c, &s)
 
 		if s.I == nil {
 			panic("IT WORKS")
@@ -71,16 +72,13 @@ func FuzzAny(f *testing.F) {
 			return nil
 		}})
 
-		var a any
+		s := struct {
+			A any
+		}{}
 
-		if err := c.GenerateStruct(&a); err != nil {
-			if errors.Is(err, bytesource.ErrNotEnoughBytes) {
-				return
-			}
-			t.Fatalf("failed to generate struct: %v", err)
-		}
+		generate(t, c, &s)
 
-		if a == "foo" {
+		if s.A == "foo" {
 			panic("IT WORKS")
 		}
 	})
@@ -91,28 +89,27 @@ func FuzzSliceAny(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, input []byte) {
 		c := NewConsumer(input)
-		c.NilChance = 0
 		c.AddFuncs([]any{func(a *any, c Continue) error {
 			*a = "foo"
 			return nil
 		}})
 
-		a := make([]any, 0)
+		s := struct{
+			A []any
+		}{}
 
-		if err := c.GenerateStruct(&a); err != nil {
-			if errors.Is(err, bytesource.ErrNotEnoughBytes) {
+		generate(t, c, &s)
+
+		if len(s.A) == 0 {
+			return
+		}
+
+		for _, v := range s.A {
+			if v != "foo" {
 				return
 			}
-			t.Fatalf("failed to generate struct: %v", err)
 		}
 
-		if len(a) > 0 {
-			for _, v := range a {
-				if v != "foo" {
-					return
-				}
-			}
-			panic("IT WORKS")
-		}
+		panic("IT WORKS")
 	})
 }
