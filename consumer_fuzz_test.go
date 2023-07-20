@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	gofuzzheaders "github.com/AdaLogics/go-fuzz-headers"
-	"github.com/AdaLogics/go-fuzz-headers/bytesource"
+	gofuzzheaders "github.com/kruskall/go-fuzz-headers"
+	"github.com/kruskall/go-fuzz-headers/bytesource"
 )
 
 func skipIfTesting(f *testing.F) {

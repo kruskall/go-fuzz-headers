@@ -18,7 +18,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/AdaLogics/go-fuzz-headers/bytesource"
+	"github.com/kruskall/go-fuzz-headers/bytesource"
 )
 
 type Continue struct {

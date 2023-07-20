@@ -19,7 +19,7 @@ import (
 	"reflect"
 	"unsafe"
 
-	"github.com/AdaLogics/go-fuzz-headers/bytesource"
+	"github.com/kruskall/go-fuzz-headers/bytesource"
 )
 
 type ConsumeFuzzer struct {
