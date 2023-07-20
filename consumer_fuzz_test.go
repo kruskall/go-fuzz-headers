@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"testing"
+	"time"
 
 	gofuzzheaders "github.com/AdaLogics/go-fuzz-headers"
 	"github.com/AdaLogics/go-fuzz-headers/bytesource"
@@ -114,5 +115,25 @@ func FuzzSliceAny(f *testing.F) {
 		}
 
 		panic("IT WORKS")
+	})
+}
+
+func FuzzUnexportedType(f *testing.F) {
+	skipIfTesting(f)
+
+	f.Fuzz(func(t *testing.T, input []byte) {
+		c := gofuzzheaders.NewConsumer(input,
+			gofuzzheaders.WithUnexportedFieldStrategy(gofuzzheaders.KeepFuzzing),
+		)
+
+		s := struct {
+			A time.Time
+		}{}
+
+		generate(t, c, &s)
+
+		if !s.A.IsZero() {
+			panic("IT WORKS")
+		}
 	})
 }

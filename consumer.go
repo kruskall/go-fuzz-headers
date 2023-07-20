@@ -104,6 +104,23 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value) error {
 	f.curDepth++
 	defer func() { f.curDepth-- }()
 
+	if !e.CanSet() {
+		if f.unexportedFieldStrategy == IgnoreValue {
+			return nil
+		}
+
+		if f.unexportedFieldStrategy == FailWithError {
+			return fmt.Errorf("found unexported field: %s", e.String())
+		}
+
+		if !e.CanAddr() {
+			return fmt.Errorf("failed to fuzz unexported field, value is not addressable: %s", e.String())
+		}
+
+		e = reflect.NewAt(e.Type(), unsafe.Pointer(e.UnsafeAddr())).Elem()
+		return f.fuzzStruct(e)
+	}
+
 	// We check if we should check for custom functions
 	if !f.disallowCustomFuncs && e.IsValid() && e.CanAddr() && f.hasCustomFunction(e.Addr()) {
 		return f.setCustom(e.Addr())
@@ -112,19 +129,9 @@ func (f *ConsumeFuzzer) fuzzStruct(e reflect.Value) error {
 	switch e.Kind() {
 	case reflect.Struct:
 		for i := 0; i < e.NumField(); i++ {
-			var v reflect.Value
-			if !e.Field(i).CanSet() {
-				if f.unexportedFieldStrategy == KeepFuzzing {
-					v = reflect.NewAt(e.Field(i).Type(), unsafe.Pointer(e.Field(i).UnsafeAddr())).Elem()
-				}
-				if err := f.fuzzStruct(v); err != nil {
-					return err
-				}
-			} else {
-				v = e.Field(i)
-				if err := f.fuzzStruct(v); err != nil {
-					return err
-				}
+			v := e.Field(i)
+			if err := f.fuzzStruct(v); err != nil {
+				return err
 			}
 		}
 	case reflect.String:
